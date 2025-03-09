@@ -6,28 +6,11 @@ import { auth } from "@/firebase";
 import { user } from "../(interface)/interface";
 import { useUser } from "../(context)/UserContext";
 
-const fetchUserFromDatabase = async (email: string) => {
-  try {
-    const user = fetch(`http://localhost:8080/api/user/${email}`);
-    const data = (await user).json();
-    return data;
-  } catch (err) {
-    console.log(err);
-  }
-};
-
 function SignIn() {
   const [emailAddr, setEmailAddr] = useState<string>("");
   const [password, setPassword] = useState<string>("");
   const { email, setEmail } = useUser();
   const router = useRouter();
-
-  // import { useEffect } from "react";
-
-  // Inside your component
-  // useEffect(() => {
-  //   alert(email);
-  // }, [email]); // Runs every time email updates
 
   const handleEmail = (e: React.ChangeEvent<HTMLInputElement>) => {
     setEmailAddr(e.target.value);

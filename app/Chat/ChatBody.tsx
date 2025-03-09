@@ -19,7 +19,9 @@ type chatProp = {
 const fetchChatsFromDatabase = async (id: string | undefined) => {
   try {
     if (id) {
-      const res = await fetch(`http://localhost:8080/api/chats/${id}`);
+      const res = await fetch(
+        `https://chatty-0o87.onrender.com/api/chats/${id}`
+      );
       const data = await res.json();
       return data;
     }
@@ -33,7 +35,9 @@ const fetchChatsFromDatabase = async (id: string | undefined) => {
 
 const fetchUserFromDatabase = async (id: string) => {
   try {
-    const res = await fetch(`http://localhost:8080/api/users/id/${id}`);
+    const res = await fetch(
+      `https://chatty-0o87.onrender.com/api/users/id/${id}`
+    );
     const data = await res.json();
     return data;
   } catch (err) {
@@ -69,7 +73,7 @@ function ChatBody() {
     const fetchData = async () => {
       try {
         const res = await fetch(
-          `http://localhost:8080/api/users/email/${email}`
+          `https://chatty-0o87.onrender.com/api/users/email/${email}`
         );
         if (!res.ok) throw new Error("Failed to fetch user"); // Handle errors properly
         const data = await res.json();

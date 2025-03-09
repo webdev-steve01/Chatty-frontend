@@ -9,7 +9,7 @@ const addDataToDatabase = async (
   password: string
 ) => {
   try {
-    await fetch("http://localhost:8080/api/users", {
+    await fetch("https://chatty-0o87.onrender.com/api/users", {
       method: "POST", // ✅ Set method to POST
       headers: {
         "Content-Type": "application/json", // ✅ Tell the server it's JSON data

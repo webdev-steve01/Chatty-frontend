@@ -21,7 +21,9 @@ type chatProp = {
 // * Function to fetch users by name
 const fetchUsersFromDatabase = async (people: string): Promise<user[]> => {
   try {
-    const res = await fetch(`http://localhost:8080/api/users/${people}`);
+    const res = await fetch(
+      `https://chatty-0o87.onrender.com/api/users/${people}`
+    );
     if (!res.ok) {
       console.log("Error fetching users:");
     }
@@ -35,7 +37,7 @@ const fetchUsersFromDatabase = async (people: string): Promise<user[]> => {
 
 const fetchChatsFromDatabase = async (id: string): Promise<chatProp[]> => {
   try {
-    const res = await fetch(`http://localhost:8080/api/chats/${id}`);
+    const res = await fetch(`https://chatty-0o87.onrender.com/api/chats/${id}`);
     if (!res.ok) {
       console.log("Failed to fetch chats");
     }
@@ -53,7 +55,7 @@ const addDataToDatabase = async (
   userTwo: string | undefined
 ) => {
   try {
-    await fetch("http://localhost:8080/api/chats", {
+    await fetch("https://chatty-0o87.onrender.com0/api/chats", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -91,7 +93,7 @@ function PeopleBody() {
     const fetchData = async () => {
       try {
         const res = await fetch(
-          `http://localhost:8080/api/users/email/${email}`
+          `https://chatty-0o87.onrender.com/api/users/email/${email}`
         );
         const data = await res.json();
         setCurrentUser(data);

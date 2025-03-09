@@ -16,7 +16,7 @@ function HomeBody() {
     <div className="m-auto p-4">
       <section className="">
         <p className="text-center text-[#283618] font-semibold text-[1.4em]">
-          Sign up to ChatApp Now!
+          {prevUser ? "Sign in to ChatApp" : "Sign up to ChatApp Now!"}
         </p>
         <div className="py-4">{prevUser ? <SignIn /> : <SignUp />}</div>
         <p className="text-[#283618]">
