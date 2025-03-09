@@ -64,7 +64,7 @@ function ChatBody() {
         router.push("../");
       }
     });
-  }, []);
+  }, [router]);
 
   // ! fetching the current user
   useEffect(() => {

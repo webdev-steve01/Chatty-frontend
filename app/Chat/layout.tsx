@@ -1,7 +1,4 @@
 import type { Metadata } from "next";
-import ChatNavFooter from "../(components)/ChatNavFooter";
-// import { Geist, Geist_Mono } from "next/font/google";
-// import { UserProvider } from "./(context)/UserContext";
 
 export const metadata: Metadata = {
   title: "Chatty chat",

@@ -1,4 +1,3 @@
-import Image from "next/image";
 import HomeBody from "./HomeBody";
 
 export default function Home() {

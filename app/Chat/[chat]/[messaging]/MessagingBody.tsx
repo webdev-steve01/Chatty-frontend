@@ -6,6 +6,13 @@ import { useEffect, useState } from "react";
 import { user } from "@/app/(interface)/interface";
 import { Socket, io } from "socket.io-client";
 
+type message = {
+  chatId: string;
+  sender: string;
+  text: string;
+  time: Date;
+};
+
 const socket: Socket = io("https://chatty-0o87.onrender.com");
 
 // Fetch current user by email
@@ -56,21 +63,21 @@ const fetchMessagesFromDatabase = async (chatId: string | undefined) => {
       `https://chatty-0o87.onrender.com/api/messages/${chatId}`
     );
     return await res.json();
-  } catch (err) {
+  } catch (err: unknown) {
     console.log(err);
     return [];
   }
 };
 
 // Save a message to the database
-const sendMessageToDatabase = async (message: any) => {
+const sendMessageToDatabase = async (message: unknown) => {
   try {
     await fetch("https://chatty-0o87.onrender.com/api/messages", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(message),
     });
-  } catch (err) {
+  } catch (err: unknown) {
     console.log("Failed to save message:", err);
   }
 };
@@ -80,7 +87,7 @@ function MessagingBody() {
   const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<user | null>(null);
   const [personChatting, setPersonChatting] = useState<user | null>(null);
-  const [messages, setMessages] = useState<any[]>([]);
+  const [messages, setMessages] = useState<message[]>([]);
   const [text, setText] = useState<string>("");
 
   const params = useParams();
@@ -151,7 +158,7 @@ function MessagingBody() {
 
   // Handle incoming messages via socket
   useEffect(() => {
-    const handleReceiveMessage = (message: any) => {
+    const handleReceiveMessage = (message: message) => {
       setMessages((prev) => [...prev, message]);
     };
 
@@ -171,7 +178,7 @@ function MessagingBody() {
         minute: "2-digit",
       });
 
-      const message = {
+      const message: unknown = {
         text,
         sender: currentUser?._id,
         chatId: chat,

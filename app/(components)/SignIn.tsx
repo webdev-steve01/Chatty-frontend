@@ -1,15 +1,14 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "@/firebase";
-import { user } from "../(interface)/interface";
 import { useUser } from "../(context)/UserContext";
 
 function SignIn() {
   const [emailAddr, setEmailAddr] = useState<string>("");
   const [password, setPassword] = useState<string>("");
-  const { email, setEmail } = useUser();
+  const { setEmail } = useUser();
   const router = useRouter();
 
   const handleEmail = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -27,15 +26,12 @@ function SignIn() {
       return;
     }
     try {
-      await signInWithEmailAndPassword(auth, emailAddr, password).then(
-        (user) => {
-          setEmail(emailAddr);
-          alert(email);
-          setEmailAddr("");
-          setPassword("");
-          router.push("/Chat");
-        }
-      );
+      await signInWithEmailAndPassword(auth, emailAddr, password).then(() => {
+        setEmail(emailAddr);
+        setEmailAddr("");
+        setPassword("");
+        router.push("/Chat");
+      });
     } catch (error) {
       console.error(error);
     }

@@ -1,7 +1,6 @@
 "use client";
 import { user } from "@/app/(interface)/interface";
 import { useState, useEffect } from "react";
-import { useUserId } from "@/app/(context)/UserIdContext";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/firebase";
 import Image from "next/image";
@@ -55,7 +54,7 @@ const addDataToDatabase = async (
   userTwo: string | undefined
 ) => {
   try {
-    await fetch("https://chatty-0o87.onrender.com0/api/chats", {
+    await fetch("https://chatty-0o87.onrender.com/api/chats", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -76,7 +75,6 @@ function PeopleBody() {
   const [email, setEmail] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<user | null>(null);
   const [prevChats, setPrevChats] = useState<chatProp[]>([]);
-  const { userId, setUserId } = useUserId();
 
   // * Fetch users by name as they are being typed
   useEffect(() => {
