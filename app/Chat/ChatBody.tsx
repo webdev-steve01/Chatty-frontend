@@ -82,7 +82,7 @@ function ChatBody() {
     if (currentUser) {
       socket.emit("user-online", currentUser?._id);
     }
-  }, [router, currentUser]);
+  }, [router]);
 
   useEffect(() => {
     if (currentUser) {
@@ -162,7 +162,7 @@ function ChatBody() {
         )
       );
     }
-  }, [lastMessages, chats]);
+  }, [lastMessages]);
 
   // ! fetching the user friends, AI helped
   useEffect(() => {
@@ -186,7 +186,7 @@ function ChatBody() {
     };
 
     fetchFriends();
-  }, [chats, currentUser]);
+  }, [chats]);
 
   // Redirect if still authenticating
   if (loading) {
