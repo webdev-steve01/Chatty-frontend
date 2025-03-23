@@ -4,260 +4,190 @@ import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/firebase";
 import { useEffect, useState } from "react";
 import { user } from "@/app/(interface)/interface";
-import { Socket, io } from "socket.io-client";
+import { io, Socket } from "socket.io-client";
 
 type message = {
   chatId: string;
   sender: string;
   text: string;
-  time: Date;
+  time: string;
 };
 
 const socket: Socket = io("https://chatty-0o87.onrender.com");
 
-// Fetch current user by email
-const fetchCurrentUserFromDatabase = async (email: string) => {
+const fetchUserByEmail = async (email: string) => {
   try {
     const res = await fetch(
       `https://chatty-0o87.onrender.com/api/users/email/${email}`
     );
     return await res.json();
   } catch (err) {
-    console.log(err);
+    console.error("Error fetching user:", err);
     return null;
   }
 };
 
-const updateChatLastMessage = async (chatId: string, message: string) => {
-  try {
-    await fetch(`https://chatty-0o87.onrender.com/api/chats/${chatId}`, {
-      method: "PATCH", // or "PUT" depending on your API
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        lastMessage: message,
-        updatedAt: new Date().toISOString(),
-      }),
-    });
-  } catch (err) {
-    console.error("Failed to update last message:", err);
-  }
-};
-
-// Fetch the person the user is chatting with by ID
-const fetchPersonChattingFromDatabase = async (id: string) => {
+const fetchUserById = async (id: string) => {
   try {
     const res = await fetch(
       `https://chatty-0o87.onrender.com/api/users/id/${id}`
     );
     return await res.json();
   } catch (err) {
-    console.log(err);
+    console.error("Error fetching user by ID:", err);
     return null;
   }
 };
 
-// Fetch messages from the database
-const fetchMessagesFromDatabase = async (chatId: string | undefined) => {
+const fetchMessages = async (chatId: string) => {
   try {
     const res = await fetch(
       `https://chatty-0o87.onrender.com/api/messages/${chatId}`
     );
     return await res.json();
-  } catch (err: unknown) {
-    console.log(err);
+  } catch (err) {
+    console.error("Error fetching messages:", err);
     return [];
   }
 };
 
-// Save a message to the database
-const sendMessageToDatabase = async (message: unknown) => {
+const sendMessageToDB = async (message: message) => {
   try {
     await fetch("https://chatty-0o87.onrender.com/api/messages", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(message),
     });
-  } catch (err: unknown) {
-    console.log("Failed to save message:", err);
+  } catch (err) {
+    console.error("Failed to save message:", err);
   }
 };
 
 function MessagingBody() {
-  const [loading, setLoading] = useState<boolean>(true);
-  const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<user | null>(null);
   const [personChatting, setPersonChatting] = useState<user | null>(null);
   const [messages, setMessages] = useState<message[]>([]);
-  const [text, setText] = useState<string>("");
+  const [text, setText] = useState("");
+  const [activeUsers, setActiveUsers] = useState<string[]>([]);
 
   const params = useParams();
-  const id = Array.isArray(params.messaging)
-    ? params.messaging[0]
-    : params.messaging;
-  const chat = Array.isArray(params.chat) ? params.chat[0] : params.chat;
+  const chatId = params.chat as string;
+  const userId = params.messaging as string;
 
   // Fetch authenticated user
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
-        setCurrentUserEmail(user.email);
+        const fetchedUser = await fetchUserByEmail(user.email!);
+        setCurrentUser(fetchedUser);
+        socket.emit("user-online", fetchedUser._id);
       }
     });
-    return () => unsubscribe(); // Cleanup listener
+
+    return () => unsubscribe();
   }, []);
 
-  // Fetch current user details
+  // Fetch the person the user is chatting with
   useEffect(() => {
-    if (currentUserEmail) {
-      const fetchData = async () => {
-        const data = await fetchCurrentUserFromDatabase(currentUserEmail);
-        setCurrentUser(data);
-      };
-      fetchData();
+    if (userId) {
+      fetchUserById(userId).then(setPersonChatting);
+      setLoading(false);
     }
-  }, [currentUserEmail]);
+  }, [userId]);
 
-  // Fetch details of the person being chatted with
+  // Fetch messages for the chat
   useEffect(() => {
-    if (id) {
-      const fetchData = async () => {
-        const data = await fetchPersonChattingFromDatabase(id);
-        setPersonChatting(data);
-        setLoading(false);
-      };
-      fetchData();
+    if (chatId) {
+      fetchMessages(chatId).then(setMessages);
     }
-  }, [id]);
+  }, [chatId]);
 
-  // Generate a unique room ID (same regardless of chat initiator)
-  const createRoomId = (
-    idOne: string | undefined,
-    idTwo: string | undefined
-  ) => {
-    return [idOne, idTwo].sort().join("_");
-  };
-  const roomId = createRoomId(currentUser?._id, id);
-
-  // Join the chat room
+  // Listen for active users
   useEffect(() => {
-    if (currentUser?.username && roomId) {
-      socket.emit("join_room", { name: currentUser.username, roomId });
-    }
-  }, [currentUser, roomId]);
-
-  // Fetch messages from DB when chat ID changes
-  useEffect(() => {
-    if (chat) {
-      const fetchMessages = async () => {
-        const data = await fetchMessagesFromDatabase(chat);
-        setMessages(data);
-      };
-      fetchMessages();
-    }
-  }, [chat, messages]);
-
-  // Handle incoming messages via socket
-  useEffect(() => {
-    const handleReceiveMessage = (message: message) => {
-      setMessages((prev) => [...prev, message]);
+    socket.on("active-users", setActiveUsers);
+    return () => {
+      socket.off("active-users");
     };
+  }, [activeUsers]);
 
-    socket.on("receive-text", handleReceiveMessage);
+  // Listen for incoming messages
+  useEffect(() => {
+    socket.on("receive-text", (message: message) => {
+      setMessages((prev) => [...prev, message]);
+    });
 
     return () => {
-      socket.off("receive-text", handleReceiveMessage); // Cleanup listener
+      socket.off("receive-text");
     };
-  }, [socket]);
+  }, []);
 
   // Send message
   const handleSend = async () => {
-    if (text.trim() !== "") {
-      const now = new Date();
-      const formattedTime = now.toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-
-      const message: unknown = {
+    if (text.trim() !== "" && currentUser?._id) {
+      const newMessage: message = {
         text,
-        sender: currentUser?._id,
-        chatId: chat,
-        time: formattedTime, // Store time in HH:mm format
+        sender: currentUser._id,
+        chatId,
+        time: new Date().toISOString(),
       };
 
-      // Emit message via socket
-      socket.emit("text", message);
+      // Update UI immediately
+      setMessages((prev) => [...prev, newMessage]);
 
-      // Save message to database
-      await sendMessageToDatabase(message);
+      // Emit to server
+      socket.emit("text", { ...newMessage, room: chatId });
 
-      // Update last message in chat
-      if (chat) {
-        await updateChatLastMessage(chat, text);
-      }
-
-      // Clear input field
+      // Save to database
+      await sendMessageToDB(newMessage);
       setText("");
     }
   };
 
-  if (loading) {
-    return (
-      <div className="h-[80vh] flex items-center justify-center">
-        <div className="loader"></div>
-      </div>
-    );
-  }
+  if (loading) return <p>Loading...</p>;
 
   return (
-    <div className="flex flex-col h-screen">
-      {/* Chat Header */}
-      <div className="flex items-center gap-2 p-4 bg-[#344E41] text-white font-semibold">
-        <div className="w-[30px] h-[30px] bg-gray-500 rounded-full "></div>
-        <p>{personChatting?.username || "Unknown"}</p>
-      </div>
-
-      {/* Chat Messages */}
-      <div className="flex-1 overflow-y-auto p-4">
-        <div className="flex flex-col">
-          {messages.length > 0 ? (
-            messages.map((message, index) => (
-              <div
-                key={index}
-                className={`p-2 rounded-lg mb-2 h-auto max-w-[70%] break-words whitespace-pre-wrap ${
-                  message.sender === currentUser?._id
-                    ? "bg-blue-500 text-white self-end"
-                    : "bg-gray-300 text-black self-start"
-                }`}
-              >
-                <p className="text-sm">{message.text}</p>
-                <p className="text-xs">
-                  {new Date(message.time).toLocaleTimeString()}
-                </p>
-              </div>
-            ))
-          ) : (
-            <p className="m-auto">No messages yet</p>
-          )}
+    <div className="flex justify-between flex-col h-[100vh]">
+      <div>
+        <div className="flex items-center gap-2 p-4 bg-[#BC6C25] text-white">
+          <div
+            style={{
+              backgroundImage: `url(${personChatting?.profilePic})`,
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+            }}
+            className="w-[50px] h-[50px] rounded-full"
+          ></div>
+          <p>{personChatting?.username || "Unknown"}</p>
+          <p>
+            {activeUsers.includes(personChatting?._id ?? "")
+              ? "(Online)"
+              : "(Offline)"}
+          </p>
+        </div>
+        <div className="flex flex-col overflow-y-auto p-4 h-[82vh]">
+          {messages.map((msg, index) => (
+            <div
+              key={index}
+              className={`p-2 my-2 rounded-md max-w-[50%] break-words ${
+                msg.sender === currentUser?._id
+                  ? "bg-gray-300 self-end"
+                  : "bg-gray-700 self-start"
+              }`}
+            >
+              {msg.text}
+            </div>
+          ))}
         </div>
       </div>
-
-      {/* Chat Input */}
-      <div className="flex p-2 bg-gray-200">
+      <div className="flex justify-self-end">
         <input
-          type="text"
-          className="flex-1 p-2 rounded-md border border-gray-400"
-          placeholder="Enter Message Here"
           value={text}
           onChange={(e) => setText(e.target.value)}
+          placeholder="Enter Message"
+          className="w-full"
         />
-        <button
-          type="button"
-          className="ml-2 px-4 py-2 bg-blue-500 text-white rounded-md"
-          onClick={handleSend}
-        >
-          Send
-        </button>
+        <button onClick={handleSend}>Send</button>
       </div>
     </div>
   );

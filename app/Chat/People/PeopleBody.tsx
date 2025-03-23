@@ -164,7 +164,7 @@ function PeopleBody() {
               <section className="rounded-[50%] bg-gray-400 w-[40px] h-[40px]"></section>
               <section>
                 <p className="font-semibold">{person.username}</p>
-                <p className="text-[0.8em]">Tap to start chatting</p>
+                <p className="text-[0.8em]">Add friend to start chatting</p>
               </section>
             </div>
             <section onClick={() => handleFriends(person._id)}>
@@ -193,7 +193,7 @@ function PeopleBody() {
           onChange={handlePerson}
         />
       </section>
-      <section className="flex flex-col gap-2 h-[80vh] overflow-scroll">
+      <section className="flex flex-col gap-2 h-[80vh] overflow-x-hidden friends overflow-scroll">
         {friend.length > 0 ? (
           peopleElement
         ) : (

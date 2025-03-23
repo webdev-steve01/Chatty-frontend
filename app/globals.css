@@ -7,6 +7,9 @@
 .container {
   margin: 5em auto;
 }
+body {
+  overflow-y: hidden;
+}
 input,
 button {
   padding: 0.5em;
@@ -83,5 +86,29 @@ button {
 
   50% {
     transform: scale(1.2, 1);
+  }
+}
+
+.friends::-webkit-scrollbar {
+  width: none;
+  display: none;
+}
+
+.messaging {
+  background-image: url("../public/HD-wallpaper-whatsapp-background-cool-dark-green-new-theme-whatsapp.jpg");
+  background-size: cover;
+  background-position: center;
+}
+@media screen and (min-width: 600px) {
+  .small_nav_container {
+    padding: 1em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .small_nav {
+    max-width: 400px;
+    margin: auto;
+    border-radius: 50px;
   }
 }

@@ -1,7 +1,7 @@
 export interface user {
   createdAt: string;
   email: string;
-  isOnline: false;
+  isOnline: string;
   password: string;
   profilePic: string;
   updatedAt: string;
