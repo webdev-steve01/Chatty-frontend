@@ -5,31 +5,50 @@ import { auth } from "@/firebase";
 import { onAuthStateChanged, User, signOut } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { user } from "../(interface)/interface";
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  doc,
+  updateDoc,
+} from "firebase/firestore";
+import { db } from "@/firebase";
 
 const handleProfilePic = async (id: string, url: string) => {
+  if (!id || !url) {
+    console.error("Invalid user ID or image URL");
+    return;
+  }
+
   try {
-    const response = await fetch(
-      "https://chatty-0o87.onrender.com/api/users/upload",
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId: id,
-          profilePic: url, // ✅ Match backend field name
-        }),
-      }
-    );
+    const userRef = doc(db, "allUsers", id); // Reference to user document
+    await updateDoc(userRef, { profilePic: url }); // Update Firestore
 
-    const data = await response.json();
+    console.log("Profile picture updated successfully in Firestore!");
+  } catch (error) {
+    console.error("Error updating profile picture:", error);
+  }
+};
 
-    if (!response.ok) {
-      console.error("Error updating profile picture:", data.error);
-      return;
+const fetchUserFromDatabase = async (email: string) => {
+  try {
+    const userRef = collection(db, "allUsers");
+    const q = query(userRef, where("email", "==", email));
+    const querySnapshot = await getDocs(q);
+    if (!querySnapshot.empty) {
+      querySnapshot.forEach((doc) => {
+        console.log("User Found:", doc.id, doc.data());
+      });
+      const doc = querySnapshot.docs[0];
+      const userData = { id: doc.id, ...doc.data() }; // Add Firestore document ID because it does not give you if it isn't requested
+
+      return userData as user;
+    } else {
+      console.log("No user found with this email.");
     }
-
-    console.log("Profile picture updated:", data);
   } catch (err) {
-    console.error("Failed to save profile picture:", err);
+    console.log(err);
   }
 };
 
@@ -61,11 +80,18 @@ function Settings() {
       );
 
       const data = await res.json();
-      console.log("Cloudinary Upload Response:", data);
 
       if (data.secure_url) {
-        console.log("Uploaded Image URL:", data.secure_url);
         setImageUrl(data.secure_url);
+        console.log("Image URL:", imageUrl); // Log the image URL
+
+        // Update Firestore with new image URL
+        if (currentUser?.id) {
+          await handleProfilePic(currentUser.id, data.secure_url);
+          setCurrentUser((prev) =>
+            prev ? { ...prev, profilePic: data.secure_url } : prev
+          );
+        }
       }
     } catch (error) {
       console.error("Upload failed:", error);
@@ -73,41 +99,15 @@ function Settings() {
   };
 
   useEffect(() => {
-    const updateProfilePic = async () => {
-      if (!imageUrl) {
-        console.error("Error: Image URL is missing!");
-        return;
+    onAuthStateChanged(auth, (user: User | null) => {
+      if (user) {
+        setEmail(user.email);
+        setLoading(false);
+      } else {
+        router.push("../");
       }
-
-      if (!currentUser?._id) {
-        console.error("Error: User ID is missing!");
-        return;
-      }
-
-      console.log("Updating profile picture with:", {
-        userId: currentUser?._id,
-        profilePic: imageUrl,
-      });
-
-      await handleProfilePic(currentUser?._id, imageUrl);
-
-      // Fetch the updated user profile after the update
-      try {
-        const res = await fetch(
-          `https://chatty-0o87.onrender.com/api/users/email/${email}`
-        );
-        if (!res.ok) throw new Error("Failed to fetch updated user");
-        setCurrentUser(await res.json());
-      } catch (err) {
-        console.error("Error fetching updated user:", err);
-      }
-    };
-
-    if (imageUrl && currentUser?._id) {
-      updateProfilePic();
-    }
-  }, [imageUrl, currentUser?._id, email]);
-
+    });
+  }, [router]);
   //! Fetch logged-in user
   useEffect(() => {
     onAuthStateChanged(auth, (user: User | null) => {
@@ -122,18 +122,7 @@ function Settings() {
 
   useEffect(() => {
     if (!email) return;
-    const fetchUser = async () => {
-      try {
-        const res = await fetch(
-          `https://chatty-0o87.onrender.com/api/users/email/${email}`
-        );
-        if (!res.ok) throw new Error("Failed to fetch user");
-        setCurrentUser(await res.json());
-      } catch (err) {
-        console.error("Error fetching user:", err);
-      }
-    };
-    fetchUser();
+    fetchUserFromDatabase(email).then((user) => setCurrentUser(user));
   }, [email]);
 
   // !log out function
@@ -151,45 +140,54 @@ function Settings() {
   }
   return (
     <section>
-      <div className="border flex gap-1 items-end">
-        <div
-          className="border relative w-[100px] h-[100px] rounded-full "
-          style={{
-            backgroundImage: currentUser?.profilePic
-              ? `url(${currentUser?.profilePic})`
-              : `url(https://res.cloudinary.com/dlpty7kky/image/upload/v1742671118/istockphoto-1495088043-612x612_dkfloi.jpg)`,
-            backgroundSize: "cover",
-            backgroundPosition: "center",
-          }}
-        ></div>
-        <div className="">
-          <input
-            type="file"
-            id="fileInput"
-            accept="image/*"
-            className="hidden" // Hides the default input
-            onChange={(e) => handleImageUpload(e)}
-          />
-
-          <label
-            htmlFor="fileInput"
-            className="cursor-pointer bg-[#bc6b25d6] text-white px-4  rounded-md hover:bg-blue-600"
-          >
-            Change Image
-          </label>
+      <div className="border h-[90vh] flex justify-center items-center">
+        <div>
+          <div className="flex flex-col items-center">
+            <div
+              className=" w-[100px] h-[100px] rounded-full "
+              style={{
+                backgroundImage: currentUser?.profilePic
+                  ? `url(${currentUser?.profilePic})`
+                  : `url(https://res.cloudinary.com/dlpty7kky/image/upload/v1742671118/istockphoto-1495088043-612x612_dkfloi.jpg)`,
+                backgroundSize: "cover",
+                backgroundPosition: "center",
+              }}
+            ></div>
+            <div className="">
+              <input
+                type="file"
+                id="fileInput"
+                accept="image/*"
+                className="hidden" // Hides the default input
+                onChange={(e) => handleImageUpload(e)}
+              />
+              <label
+                htmlFor="fileInput"
+                className="cursor-pointer bg-[#bc6b25d6] text-white px-4 py  rounded-md hover:bg-[#bc6b25a9]"
+              >
+                Change Image
+              </label>
+            </div>
+          </div>
+          <div>
+            <p>
+              <span className="font-semibold">username</span> {""}
+              {currentUser?.name ? currentUser.name : "Loading..."}
+            </p>
+            <p>
+              <span className="font-semibold">email</span>:{" "}
+              {currentUser?.email ? currentUser.email : "Loading..."}
+            </p>
+            <p>
+              <span className="font-semibold">user Id</span>:{" "}
+              {currentUser?.id ? currentUser.id : "Loading..."}
+            </p>
+          </div>
+          <button type="button" onClick={handleLogOut}>
+            Log Out
+          </button>
         </div>
       </div>
-      <div>
-        <p>
-          username: {""}
-          {currentUser?.username ? currentUser.username : "Loading..."}
-        </p>
-        <p>email: {currentUser?.email ? currentUser.email : "Loading..."}</p>
-        <p>user Id: {currentUser?._id ? currentUser._id : "Loading..."}</p>
-      </div>
-      <button type="button" onClick={handleLogOut}>
-        Log Out
-      </button>
       <ChatNavFooter />
     </section>
   );

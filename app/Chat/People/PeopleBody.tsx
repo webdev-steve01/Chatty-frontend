@@ -1,5 +1,5 @@
 "use client";
-import { user } from "@/app/(interface)/interface";
+import { user, chats } from "@/app/(interface)/interface";
 import { useState, useEffect } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/firebase";
@@ -7,44 +7,80 @@ import Image from "next/image";
 import plus from "@/public/plus-svgrepo-com.svg";
 import tick from "@/public/tick-svgrepo-com.svg";
 import ChatNavFooter from "@/app/(components)/ChatNavFooter";
+import { collection, query, where, getDocs, addDoc } from "firebase/firestore";
+import { useRouter } from "next/navigation";
+import { db } from "@/firebase";
+import { User } from "firebase/auth";
 
-type chatProp = {
-  _id: string;
-  members: string[];
-  lastMessage: string;
-  createdAt: string;
-  updatedAt: string;
-  __v: number;
+const fetchCurrentUserFromDatabase = async (email: string) => {
+  try {
+    const userRef = collection(db, "allUsers");
+    const q = query(userRef, where("email", "==", email));
+    const querySnapshot = await getDocs(q);
+    if (!querySnapshot.empty) {
+      querySnapshot.forEach((doc) => {
+        console.log("User Found:", doc.id, doc.data());
+      });
+      const userData = querySnapshot.docs[0].data();
+      return userData as user;
+    } else {
+      console.log("No user found with this email.");
+    }
+  } catch (err) {
+    console.log(err);
+  }
 };
 
 // * Function to fetch users by name
 const fetchUsersFromDatabase = async (people: string): Promise<user[]> => {
   try {
-    const res = await fetch(
-      `https://chatty-0o87.onrender.com/api/users/${people}`
-    );
-    if (!res.ok) {
-      console.log("Error fetching users:");
+    let q;
+    const usersRef = collection(db, "allUsers");
+    if (people.trim() !== "") {
+      q = query(usersRef, where("name", "==", people));
+    } else {
+      q = query(usersRef);
     }
-    const data = await res.json();
-    return Array.isArray(data) ? data : [];
+
+    const querySnapshot = await getDocs(q);
+
+    return querySnapshot.docs.map((doc) => {
+      const data = doc.data();
+
+      return {
+        id: doc.id,
+        name: data.name ?? "",
+        email: data.email ?? "",
+        password: data.password ?? "",
+        profilePic: data.profilePic ?? "",
+        isOnline: String(data.isOnline ?? "false"),
+        createdAt:
+          data.createdAt?.toDate?.().toISOString() ?? new Date().toISOString(),
+        updatedAt:
+          data.updatedAt?.toDate?.().toISOString() ?? new Date().toISOString(),
+      };
+    });
   } catch (err) {
     console.error("Error fetching users:", err);
     return [];
   }
 };
 
-const fetchChatsFromDatabase = async (id: string): Promise<chatProp[]> => {
+const fetchChatsFromDatabase = async (userId: string) => {
   try {
-    const res = await fetch(`https://chatty-0o87.onrender.com/api/chats/${id}`);
-    if (!res.ok) {
-      console.log("Failed to fetch chats");
-    }
-    const data = await res.json();
-    return Array.isArray(data) ? data : [];
+    const q = query(
+      collection(db, "chats"),
+      where("members", "array-contains", userId)
+    );
+    const querySnapshot = await getDocs(q);
+    const chats = querySnapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
+    console.log("User Chats:", chats);
+    return chats as chats[];
   } catch (err) {
-    console.error("Error fetching chats:", err);
-    return [];
+    console.log("Error fetching chats:", err);
   }
 };
 
@@ -54,14 +90,15 @@ const addDataToDatabase = async (
   userTwo: string | undefined
 ) => {
   try {
-    await fetch("https://chatty-0o87.onrender.com/api/chats", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ userOne, userTwo }),
-    });
-
+    const chatRef = collection(db, "chats");
+    const newChat = {
+      members: [userOne, userTwo],
+      lastMessage: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    await addDoc(chatRef, newChat);
+    console.log("Chat added successfully");
     return true; // Return true on success
   } catch (err) {
     console.log("Error adding chat:", err);
@@ -74,32 +111,19 @@ function PeopleBody() {
   const [person, setPerson] = useState<string>("");
   const [email, setEmail] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<user | null>(null);
-  const [prevChats, setPrevChats] = useState<chatProp[]>([]);
-
-  // * Fetch users by name as they are being typed
-  useEffect(() => {
-    const fetchData = async () => {
-      const data = await fetchUsersFromDatabase(person);
-      setFriend(data);
-    };
-    fetchData();
-  }, [person]);
+  const [prevChats, setPrevChats] = useState<chats[]>([]);
+  const [searchLoading, setSearchLoading] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(true);
+  const router = useRouter();
 
   // * Fetch the current user
   useEffect(() => {
     if (!email) return;
-    const fetchData = async () => {
-      try {
-        const res = await fetch(
-          `https://chatty-0o87.onrender.com/api/users/email/${email}`
-        );
-        const data = await res.json();
-        setCurrentUser(data);
-      } catch (err) {
-        console.log(err);
+    fetchCurrentUserFromDatabase(email).then((userData) => {
+      if (userData) {
+        setCurrentUser(userData);
       }
-    };
-    fetchData();
+    });
   }, [email]);
 
   // * Firebase auth listener
@@ -113,17 +137,17 @@ function PeopleBody() {
 
   // * Fetch previous chats
   useEffect(() => {
-    if (!currentUser?._id) return;
+    if (!currentUser?.email) return;
     const fetchChats = async () => {
-      const data = await fetchChatsFromDatabase(currentUser._id);
-      setPrevChats(data);
+      const data = await fetchChatsFromDatabase(currentUser.email);
+      if (data) setPrevChats(data);
     };
     fetchChats();
   }, [currentUser]);
 
   // * Function to handle adding a friend
   const handleFriends = async (personId: string) => {
-    if (!currentUser?._id) return;
+    if (!currentUser?.email) return;
 
     const chatExists = prevChats.some((chat) =>
       chat.members.includes(personId)
@@ -134,12 +158,12 @@ function PeopleBody() {
     }
 
     // Add chat to database
-    const success = await addDataToDatabase(currentUser._id, personId);
+    const success = await addDataToDatabase(currentUser.email, personId);
 
     if (success) {
       // Refetch chats immediately to update UI
-      const updatedChats = await fetchChatsFromDatabase(currentUser._id);
-      setPrevChats(updatedChats);
+      const updatedChats = await fetchChatsFromDatabase(currentUser.email);
+      if (updatedChats) setPrevChats(updatedChats);
     }
   };
 
@@ -148,26 +172,69 @@ function PeopleBody() {
     setPerson(e.target.value);
   };
 
+  // ! Authentication function
+  useEffect(() => {
+    onAuthStateChanged(auth, (user: User | null) => {
+      if (user) {
+        setEmail(user.email);
+        setLoading(false);
+      } else {
+        router.push("../");
+      }
+    });
+  }, [router]);
+
+  // !search function
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setSearchLoading(true);
+    if (!person.trim()) return; // Prevent empty input
+    const fetchData = async () => {
+      await fetchUsersFromDatabase(person)
+        .then((data) => setFriend(data))
+        .catch((err) => console.log(err))
+        .finally(() => setSearchLoading(false));
+    };
+    fetchData();
+    setPerson("");
+  };
+
   // * JSX for available friends
+  // Redirect if still authenticating
+  if (loading === true) {
+    return (
+      <div className="h-[80vh] flex items-center justify-center" key={1}>
+        <div className="loader"></div>
+      </div>
+    );
+  }
   const peopleElement = friend
-    .slice(0, 10)
-    .filter((person: user) => person._id !== currentUser?._id)
+    .filter((person: user) => person.email !== currentUser?.email)
     .map((person: user, index: number) => {
       const isChatExisting = prevChats.some((chat) =>
-        chat.members.includes(person._id)
+        chat.members.includes(person.email)
       );
 
       return (
         <div key={index} className="cursor-pointer">
           <section className="flex justify-between items-center px-6 py-2">
             <div className="flex gap-5">
-              <section className="rounded-[50%] bg-gray-400 w-[40px] h-[40px]"></section>
+              <div
+                className="w-[50px] h-[50px] rounded-full"
+                style={{
+                  backgroundImage: person.profilePic
+                    ? `url(${person.profilePic})`
+                    : `url(https://res.cloudinary.com/dlpty7kky/image/upload/v1742671118/istockphoto-1495088043-612x612_dkfloi.jpg)`,
+                  backgroundSize: "cover",
+                  backgroundPosition: "center",
+                }}
+              ></div>
               <section>
-                <p className="font-semibold">{person.username}</p>
+                <p className="font-semibold">{person.name}</p>
                 <p className="text-[0.8em]">Add friend to start chatting</p>
               </section>
             </div>
-            <section onClick={() => handleFriends(person._id)}>
+            <section onClick={() => handleFriends(person.email)}>
               <Image
                 src={isChatExisting ? tick : plus}
                 height={20}
@@ -186,18 +253,30 @@ function PeopleBody() {
         <p>Search friends and start a chat</p>
       </section>
       <section className="flex justify-center text-[#283618] py-2">
-        <input
-          type="text"
-          className="m-auto w-[90%] border-[#283618]"
-          placeholder="Search"
-          onChange={handlePerson}
-        />
+        <form
+          action=""
+          onSubmit={(e) => handleSubmit(e)}
+          className="flex gap-2   w-full px-6"
+        >
+          <input
+            type="text"
+            className="m-auto w-full border-[#283618]"
+            placeholder="Please Be case sensitive..."
+            value={person}
+            onChange={handlePerson}
+          />
+          <button type="submit">search</button>
+        </form>
       </section>
       <section className="flex flex-col gap-2 h-[80vh] overflow-x-hidden friends overflow-scroll">
-        {friend.length > 0 ? (
+        {searchLoading ? (
+          <div className="h-[100%] flex items-center justify-center">
+            <div className="loader"></div>
+          </div>
+        ) : friend.length > 0 ? (
           peopleElement
         ) : (
-          <p className="mx-auto italic text-gray-400">No such person</p>
+          <p className="mx-auto italic text-gray-400">List is empty</p>
         )}
       </section>
       <section>

@@ -4,10 +4,13 @@ import { useRouter } from "next/navigation";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "@/firebase";
 import { useUser } from "../(context)/UserContext";
+import { FirebaseError } from "firebase/app";
 
 function SignIn() {
   const [emailAddr, setEmailAddr] = useState<string>("");
   const [password, setPassword] = useState<string>("");
+  const [loggingIn, setLoggingIn] = useState<boolean>(false);
+  // const [err, setErr] = useState<string>("");
   const { setEmail } = useUser();
   const router = useRouter();
 
@@ -32,8 +35,31 @@ function SignIn() {
         setPassword("");
         router.push("/Chat");
       });
-    } catch (error) {
+    } catch (error: unknown) {
       console.error(error);
+
+      // Firebase errors have a `.code` property
+      if (error instanceof FirebaseError) {
+        switch (error.code) {
+          case "auth/email-already-in-use":
+            alert("This email is already in use.");
+            break;
+          case "auth/invalid-email":
+            alert("The email address is invalid.");
+            break;
+          case "auth/weak-password":
+            alert("Password should be at least 6 characters.");
+            break;
+          case "auth/network-request-failed":
+            alert("Network error. Please check your connection.");
+            break;
+          default:
+            alert("Something went wrong. Please try again.");
+            break;
+        }
+      }
+
+      setLoggingIn(false);
     }
   };
   return (
@@ -58,7 +84,7 @@ function SignIn() {
           onChange={(e) => handlePassword(e)}
           value={password}
         />
-        <button type="submit"> sign in</button>
+        <button type="submit">{loggingIn ? "Logging In..." : "Sign In"}</button>
       </form>
     </>
   );

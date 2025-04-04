@@ -2,23 +2,15 @@
 import { useEffect, useState } from "react";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { useRouter } from "next/navigation";
-import { auth } from "@/firebase";
-import io from "socket.io-client";
-import { user } from "../(interface)/interface";
+import { auth, db } from "@/firebase";
+// import io from "socket.io-client";
+import { user, chats } from "../(interface)/interface";
 import ChatNavFooter from "../(components)/ChatNavFooter";
 import Image from "next/image";
-import empty from "@/public/empty.svg";
+import empty from "@/public/undraw_back-home_3dun.svg";
+import { collection, query, where, getDocs } from "firebase/firestore";
 
-const socket = io("http://localhost:8080");
-
-type chatProp = {
-  _id: string;
-  members: string[];
-  lastMessage: string | null;
-  createdAt: string;
-  updatedAt: string;
-  __v: number;
-};
+// const socket = io("http://localhost:8080");
 
 type lastMessageType = {
   _id: string;
@@ -29,44 +21,60 @@ type lastMessageType = {
   __v: number;
 };
 
-// Function to fetch last message
-const fetchLastMessageFromDatabase = async (
-  id: string
-): Promise<lastMessageType | null> => {
+const fetchUserFromDatabase = async (email: string) => {
   try {
-    const res = await fetch(
-      `https://chatty-0o87.onrender.com/api/messages/id/${id}`
-    );
-    if (!res.ok) throw new Error("Failed to fetch last message");
-    return await res.json();
-  } catch (err) {
-    console.log("Error fetching last message:", err);
-    return null;
-  }
-};
-
-const fetchUserFromDatabase = async (id: string) => {
-  try {
-    const res = await fetch(
-      `https://chatty-0o87.onrender.com/api/users/id/${id}`
-    );
-    const data = await res.json();
-    return data;
+    const userRef = collection(db, "allUsers");
+    const q = query(userRef, where("email", "==", email));
+    const querySnapshot = await getDocs(q);
+    if (!querySnapshot.empty) {
+      querySnapshot.forEach((doc) => {
+        console.log("User Found:", doc.id, doc.data());
+      });
+      const doc = querySnapshot.docs[0];
+      const userData = { id: doc.id, ...doc.data() }; // Add Firestore document ID
+      return userData as user;
+    } else {
+      console.log("No user found with this email.");
+    }
   } catch (err) {
     console.log(err);
   }
 };
 
+const fetchChats = async (userId: string) => {
+  try {
+    const q = query(
+      collection(db, "chats"),
+      where("members", "array-contains", userId)
+    );
+    const querySnapshot = await getDocs(q);
+    const chats = querySnapshot.docs.map((doc) => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        createdAt: data.createdAt.toDate?.() ?? new Date(), // ensure Date
+        updatedAt: data.updatedAt.toDate?.() ?? new Date(),
+        lastMessage: data.lastMessage ?? null,
+        members: data.members ?? [],
+      } as chats;
+    });
+
+    console.log("User Chats:", chats);
+    return chats;
+  } catch (err) {
+    console.log("Error fetching chats:", err);
+  }
+};
 function ChatBody() {
-  const [chats, setChats] = useState<chatProp[]>([]);
+  const [chats, setChats] = useState<chats[]>([]);
   const [lastMessages, setLastMessages] = useState<
     Record<string, lastMessageType | null>
   >({});
-  const [friends, setFriends] = useState<Record<string, user>>({});
+  const [friends, setFriends] = useState<Array<user>>([]);
+  const [friendEmail, setFriendEmail] = useState<string[]>([]);
   const [currentUser, setCurrentUser] = useState<user>();
   const [email, setEmail] = useState<string | null>();
   const [loading, setLoading] = useState<boolean>(true);
-  const [activeUsers, setActiveUsers] = useState<string[]>([]);
   const router = useRouter();
 
   // Fetch logged-in user
@@ -79,114 +87,81 @@ function ChatBody() {
         router.push("../");
       }
     });
-    if (currentUser) {
-      socket.emit("user-online", currentUser?._id);
-    }
   }, [router]);
-
-  useEffect(() => {
-    if (currentUser) {
-      socket.emit("user-online", currentUser?._id);
-      socket.on("active-users", (users: string[]) => {
-        setActiveUsers(users);
-        console.log(activeUsers);
-      });
-    }
-
-    return () => {
-      socket.off("active-users");
-    };
-  });
 
   // Fetch user details
   useEffect(() => {
     if (!email) return;
-    const fetchUser = async () => {
-      try {
-        const res = await fetch(
-          `https://chatty-0o87.onrender.com/api/users/email/${email}`
-        );
-        if (!res.ok) throw new Error("Failed to fetch user");
-        setCurrentUser(await res.json());
-      } catch (err) {
-        console.error("Error fetching user:", err);
+    // fetchLastMessageFromDatabase(email);
+    fetchUserFromDatabase(email).then((userData) => {
+      if (userData) {
+        setCurrentUser(userData);
       }
-    };
-    fetchUser();
+    });
   }, [email]);
 
-  // Fetch chats
   useEffect(() => {
-    if (!currentUser?._id) return;
-    const fetchChats = async () => {
-      try {
-        const res = await fetch(
-          `https://chatty-0o87.onrender.com/api/chats/${currentUser._id}`
-        );
-        if (!res.ok) throw new Error("Failed to fetch chats");
-        const data = await res.json();
-        setChats(data);
-      } catch (err) {
-        console.error("Error fetching chats:", err);
-      }
-    };
-    fetchChats();
-  }, [currentUser?._id]);
-
-  // Fetch last messages for each chat
+    setLastMessages({});
+  }, []);
   useEffect(() => {
-    if (chats.length === 0) return;
-    const fetchLastMessages = async () => {
-      const messages = await Promise.all(
-        chats.map(async (chat) => {
-          if (chat.lastMessage) {
-            return {
-              [chat._id]: await fetchLastMessageFromDatabase(chat.lastMessage),
-            };
-          }
-          return { [chat._id]: null };
-        })
-      );
-      setLastMessages(Object.assign({}, ...messages));
-    };
-    fetchLastMessages();
-  }, [chats]);
-
-  // Sorting chats based on last update
-  useEffect(() => {
-    if (chats.length > 0) {
-      setChats(
-        [...chats].sort(
-          (a, b) =>
-            new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-        )
+    if (currentUser) {
+      fetchChats(currentUser?.email).then((chatsData) =>
+        setChats(chatsData ?? [])
       );
     }
-  }, [lastMessages]);
+  }, [currentUser]);
 
-  // ! fetching the user friends, AI helped
+  // Fetch chats from the server
   useEffect(() => {
-    if (!currentUser || chats?.length === 0) return; // Ensure currentUser is set
+    if (!chats.length || !currentUser?.email) return;
+
+    const filterChatMembers = (chats: chats[], myEmail: string) => {
+      const emails: string[] = chats
+        .map((chat) => chat.members.find((email) => email !== myEmail))
+        .filter((email): email is string => Boolean(email)); // Type assertion
+
+      setFriendEmail(emails);
+      console.log("Friend Emails:", emails);
+    };
+
+    filterChatMembers(chats, currentUser.email);
+  }, [chats, currentUser]);
+
+  useEffect(() => {
+    if (friendEmail.length === 0) return;
 
     const fetchFriends = async () => {
-      const uniqueIds = new Set(
-        chats?.flatMap((chat) =>
-          chat.members.filter((member) => member !== currentUser._id)
-        )
-      );
-
-      const friendData = await Promise.all(
-        Array.from(uniqueIds).map(async (userId) => {
-          const user = await fetchUserFromDatabase(userId);
-          return { [userId]: user };
+      const friendsData = await Promise.all(
+        friendEmail.map(async (email) => {
+          const userData = await fetchUserFromDatabase(email);
+          return userData || null;
         })
       );
 
-      setFriends(Object.assign({}, ...friendData.sort()));
+      // TypeScript-safe filtering of null values
+      setFriends(friendsData.filter((user): user is user => user !== null));
     };
 
     fetchFriends();
-  }, [chats]);
+  }, [friendEmail]);
+
+  useEffect(() => {
+    if (friends) console.log(friends);
+  }, [friends]);
+
+  // Fetch last messages for each chat
+
+  // Sorting chats based on last update
+  // useEffect(() => {
+  //   if (chats.length > 0) {
+  //     setChats(
+  //       [...chats].sort(
+  //         (a, b) =>
+  //           new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+  //       )
+  //     );
+  //   }
+  // }, [lastMessages]);
 
   // Redirect if still authenticating
   if (loading) {
@@ -197,70 +172,72 @@ function ChatBody() {
     );
   }
 
-  const goToMessages = (id: string | undefined, chatId: string | undefined) => {
-    router.push(`/Chat/${chatId}/${id}`);
+  const goToMessages = (
+    friendId: string | undefined,
+    chatId: string | undefined
+  ) => {
+    if (!friendId) return;
+    router.push(`/Chat/${chatId}/${friendId}`);
   };
 
   return (
-    <div>
-      <section className="text-[#283618] bg-[#BC6C25] text-[1.5em] font-semibold px-6 py-2">
-        <div className="flex gap-3 items-center">
-          <div
-            className="w-[50px] h-[50px] rounded-full"
-            style={{
-              backgroundImage: currentUser?.profilePic
-                ? `url(${currentUser?.profilePic})`
-                : `url(https://res.cloudinary.com/dlpty7kky/image/upload/v1742671118/istockphoto-1495088043-612x612_dkfloi.jpg)`,
-              backgroundSize: "cover",
-              backgroundPosition: "center",
-            }}
-          ></div>
-          <p>Hello {currentUser?.username}</p>
-        </div>
-      </section>
-      <section>
-        {chats?.length > 0 ? (
-          chats?.map((chat, index) => {
+    <div className="">
+      <div className="bg-red-700 px-4 py-2">
+        <p className="text-[1.3em]">Chats</p>
+      </div>
+      {chats?.length > 0 ? (
+        <div>
+          {chats.map((chat, index) => {
+            // Get the friend's ID (the member that is NOT the current user)
             const friendId = chat.members.find(
-              (member) => member !== currentUser?._id
+              (member: string) => member !== currentUser?.email
             );
-            const friend = friendId ? friends[friendId] : null;
+            const friend = friends.find(
+              (user: user) => user.email === friendId
+            ); // Find the friend in the friends array
+            const lastMessage =
+              lastMessages[chat.id]?.text || "No messages yet"; // Get last message
+
             return (
               <div
                 key={index}
-                onClick={() => goToMessages(friendId, chat._id)}
-                className="p-4 border-b flex items-center gap-4 cursor-default "
+                className="border px-4 py-2 cursor-pointer"
+                onClick={() => goToMessages(friend?.id, chat.id)}
               >
-                <div
-                  className="w-[50px] h-[50px] rounded-full"
-                  style={{
-                    backgroundImage: friend?.profilePic
-                      ? `url(${friend?.profilePic})`
-                      : `url(https://res.cloudinary.com/dlpty7kky/image/upload/v1742671118/istockphoto-1495088043-612x612_dkfloi.jpg)`,
-                    backgroundSize: "cover",
-                    backgroundPosition: "center",
-                  }}
-                ></div>
-                <div>
-                  <p className="font-semibold">
-                    {friend ? friend.username : "Loading..."}
-                  </p>
-                  <p className="text-gray-500 text-[0.8em] italic truncate w-[200px] overflow-hidden whitespace-nowrap">
-                    {lastMessages[chat._id]?.text || "no messages yet"}
-                  </p>
+                <div className="flex gap-2 items-center">
+                  <div
+                    className="w-[50px] h-[50px] rounded-full"
+                    style={{
+                      backgroundImage: friend?.profilePic
+                        ? `url(${friend?.profilePic})`
+                        : `url(https://res.cloudinary.com/dlpty7kky/image/upload/v1742671118/istockphoto-1495088043-612x612_dkfloi.jpg)`,
+                      backgroundSize: "cover",
+                      backgroundPosition: "center",
+                    }}
+                  ></div>
+                  <div>
+                    <p className="font-semibold">
+                      {friend?.name || "Loading..."}
+                    </p>
+                    <p className="text-gray-500 text-[0.8em] italic truncate w-[200px] overflow-hidden whitespace-nowrap">
+                      {lastMessage}
+                    </p>
+                  </div>
                 </div>
               </div>
             );
-          })
-        ) : (
-          <div className="w-full h-[80vh] flex justify-center items-center">
-            <Image src={empty} height={500} width={500} alt="empty" />
+          })}
+        </div>
+      ) : (
+        <div className="w-[100%] h-[70vh] flex justify-center items-center">
+          <div>
+            <Image src={empty} height={300} width={300} alt="empty" />
+            <p className="text-center">make some friends and start chatting!</p>
           </div>
-        )}
-      </section>
-      <section>
-        <ChatNavFooter />
-      </section>
+        </div>
+      )}
+
+      <ChatNavFooter />
     </div>
   );
 }

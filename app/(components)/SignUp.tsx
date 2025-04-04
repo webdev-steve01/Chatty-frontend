@@ -1,32 +1,9 @@
 "use client";
 import { useState } from "react";
 import { createUserWithEmailAndPassword } from "firebase/auth";
-import { auth } from "@/firebase";
-
-const addDataToDatabase = async (
-  name: string,
-  email: string,
-  password: string
-) => {
-  try {
-    await fetch("https://chatty-0o87.onrender.com/api/users", {
-      method: "POST", // ✅ Set method to POST
-      headers: {
-        "Content-Type": "application/json", // ✅ Tell the server it's JSON data
-      },
-      body: JSON.stringify({
-        username: name,
-        email: email,
-        password: password,
-      }),
-    })
-      .then((response) => response.json()) // ✅ Convert response to JSON
-      .then((data) => console.log("Chat Created:", data)) // ✅ Handle response
-      .catch((error) => console.error("Error:", error));
-  } catch (err) {
-    console.log(err);
-  }
-};
+import { addDoc, collection } from "firebase/firestore";
+import { auth, db } from "@/firebase";
+import { FirebaseError } from "firebase/app";
 
 function SignUp() {
   const [name, setName] = useState("");
@@ -58,7 +35,11 @@ function SignUp() {
         (userCredential) => {
           const user = userCredential.user;
           console.log(user);
-          addDataToDatabase(name, email, password);
+          addDoc(collection(db, `allUsers`), {
+            name,
+            email,
+            createdAt: new Date(),
+          });
           setEmail("");
           setPassword("");
           setName("");
@@ -66,8 +47,31 @@ function SignUp() {
           alert("User Created Successfully, click on sign in");
         }
       );
-    } catch (error) {
+    } catch (error: unknown) {
       console.error(error);
+
+      // Firebase errors have a `.code` property
+      if (error instanceof FirebaseError) {
+        switch (error.code) {
+          case "auth/email-already-in-use":
+            alert("This email is already in use.");
+            break;
+          case "auth/invalid-email":
+            alert("The email address is invalid.");
+            break;
+          case "auth/weak-password":
+            alert("Password should be at least 6 characters.");
+            break;
+          case "auth/network-request-failed":
+            alert("Network error. Please check your connection.");
+            break;
+          default:
+            alert("Something went wrong. Please try again.");
+            break;
+        }
+      }
+
+      setSigningIn(false);
     }
   };
 
