@@ -183,9 +183,11 @@ function Settings() {
               {currentUser?.id ? currentUser.id : "Loading..."}
             </p>
           </div>
-          <button type="button" onClick={handleLogOut}>
-            Log Out
-          </button>
+          <div className="py-2">
+            <button type="button" className="w-full" onClick={handleLogOut}>
+              Log Out
+            </button>
+          </div>
         </div>
       </div>
       <ChatNavFooter />
