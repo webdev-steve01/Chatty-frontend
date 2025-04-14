@@ -140,7 +140,7 @@ function Settings() {
   }
   return (
     <section>
-      <div className="border h-[90vh] flex justify-center items-center">
+      <div className="h-[90vh] flex justify-center items-center">
         <div>
           <div className="flex flex-col items-center">
             <div

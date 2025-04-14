@@ -1,3 +1,4 @@
+import { serverTimestamp } from "firebase/firestore";
 export interface user {
   id: string;
   createdAt: string;
@@ -12,7 +13,7 @@ export interface user {
 export interface chats {
   id: string;
   createdAt: Date;
-  lastMessage: unknown;
+  lastMessage: string | null;
   members: Array<string>;
   updatedAt: Date;
 }
