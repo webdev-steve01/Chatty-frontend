@@ -176,8 +176,8 @@ function MessageBody() {
         chatId,
         timestamp: new Date(), // Firebase timestamp
       };
-      await addDoc(collection(db, "messages"), message);
-      await addDoc(collection(db, "messages"), message);
+      await addDoc(collection(db, "messages"), message); // Add message to Firestore
+      console.log("Message sent:", message);
       updateLastMessage(message); // immediately update last message
 
       setText(""); // Clear input after sending
