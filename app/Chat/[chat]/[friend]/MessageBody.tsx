@@ -170,8 +170,10 @@ function MessageBody() {
         alert("complex error");
         return;
       }
+      const newText = text.trim(); // Trim whitespace from the message
+      setText(""); // Clear input field
       const message: Message = {
-        text,
+        text: newText,
         senderId: currentUser.id,
         chatId,
         timestamp: new Date(), // Firebase timestamp
