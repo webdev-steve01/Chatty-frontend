@@ -1,4 +1,3 @@
-import { serverTimestamp } from "firebase/firestore";
 export interface user {
   id: string;
   createdAt: string;

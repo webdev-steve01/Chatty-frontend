@@ -12,7 +12,6 @@ import {
   orderBy,
   onSnapshot,
 } from "firebase/firestore";
-import { serverTimestamp } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "@/firebase";
 import { useRouter, useParams } from "next/navigation";
