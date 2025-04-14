@@ -204,7 +204,7 @@ function MessageBody() {
         ></div>
         <p>{friend?.name}</p>
       </div>
-      <div className="absolute bottom-0 w-full  h-[88vh]">
+      <div className="absolute bottom-0 w-full  h-[85vh]">
         <div className="w-full h-[80vh] overflow-auto justify-self-end">
           {messages.map((message: Message, index: number) => (
             <div key={index} className="p-2 my-1 border-b">
