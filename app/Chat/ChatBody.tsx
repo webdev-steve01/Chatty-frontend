@@ -7,6 +7,7 @@ import { user, chats } from "../(interface)/interface";
 import ChatNavFooter from "../(components)/ChatNavFooter";
 import Image from "next/image";
 import empty from "@/public/undraw_back-home_3dun.svg";
+import { Message } from "../(interface)/interface";
 import {
   collection,
   query,
@@ -161,7 +162,8 @@ const ChatBody = () => {
               (member) => member !== currentUser?.email
             );
             const friend = friends.find((u) => u.email === friendId);
-            const lastMessage = chat.lastMessage || "No messages yet";
+            const lastMessage: Message | string =
+              chat.lastMessage || "No messages yet";
 
             return (
               <div
@@ -185,9 +187,11 @@ const ChatBody = () => {
                       {friend?.name || "Loading..."}
                     </p>
                     <p className="text-gray-500 text-[0.8em] italic truncate w-[200px] overflow-hidden whitespace-nowrap">
-                      {typeof lastMessage === "string"
-                        ? lastMessage
-                        : lastMessage?.text || "No messages yet"}
+                      {chat.lastMessage
+                        ? typeof lastMessage === "string"
+                          ? lastMessage
+                          : (lastMessage as Message).text
+                        : "No messages yet"}
                     </p>
                   </div>
                 </div>

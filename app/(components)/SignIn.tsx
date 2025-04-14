@@ -24,6 +24,7 @@ function SignIn() {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    setLoggingIn(true);
     if (emailAddr === "" || password === "") {
       alert("Please fill all the fields");
       return;
