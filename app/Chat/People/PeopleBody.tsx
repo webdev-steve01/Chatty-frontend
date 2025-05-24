@@ -249,7 +249,7 @@ function PeopleBody() {
 
   return (
     <div>
-      <section className="text-[#283618] bg-[#BC6C25] text-[1.5em] font-semibold px-6 py-2">
+      <section className="text-[#283618] bg-[#BC6C25] text-[1.3em] font-semibold px-6 py-2">
         <p>Search friends and start a chat</p>
       </section>
       <section className="flex justify-center text-[#283618] py-2">
@@ -261,7 +261,7 @@ function PeopleBody() {
           <input
             type="text"
             className="m-auto w-full border-[#283618]"
-            placeholder="Please Be case sensitive..."
+            placeholder="e.g andre"
             value={person}
             onChange={handlePerson}
           />

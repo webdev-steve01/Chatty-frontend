@@ -10,5 +10,9 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  return <div className="h-[100vh]">{children}</div>;
+  return (
+    <div className="h-[95vh] max-w-[700px] mx-auto  my-2 bg-[#FEFAE0]">
+      {children}
+    </div>
+  );
 }

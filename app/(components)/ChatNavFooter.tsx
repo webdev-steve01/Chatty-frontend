@@ -13,7 +13,7 @@ function ChatNavFooter() {
   const pathname = usePathname(); // Get current route
 
   return (
-    <div className="small_nav_container fixed bottom-0 w-full">
+    <div className="small_nav_container fixed left-0 right-0 bottom-[20px] w-full">
       <section className="flex  w-full  justify-between px-6 bg-[#BC6C25] py-2 small_nav">
         <Link
           href="/Chat"
